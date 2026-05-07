@@ -46,16 +46,18 @@ SignalRX/
     └── vite.config.js  # Vite configuration
 ```
 
-## Getting Started
+## Instructions to Run
+
+To run the project locally so reviewers can test the platform, follow the steps below.
 
 ### Prerequisites
 - Node.js (v18+)
 - Python (3.9+)
-- MongoDB instance
+- MongoDB instance (Local or Atlas)
 - Firebase Project configured
 - Groq API Key
 
-### Backend Setup
+### 1. Backend Setup
 
 1. Navigate to the backend directory:
    ```bash
@@ -70,7 +72,7 @@ SignalRX/
    ```bash
    pip install -r requirements.txt
    ```
-4. Configure environment variables (create a `.env` file):
+4. Configure environment variables (create a `.env` file in the `backend/` directory):
    ```env
    MONGODB_URI=your_mongodb_connection_string
    GROQ_API_KEY=your_groq_api_key
@@ -79,8 +81,9 @@ SignalRX/
    ```bash
    uvicorn main:app --reload
    ```
+   *The backend will be available at `http://127.0.0.1:8000`*
 
-### Frontend Setup
+### 2. Frontend Setup
 
 1. Navigate to the frontend directory:
    ```bash
@@ -90,7 +93,7 @@ SignalRX/
    ```bash
    npm install
    ```
-3. Configure environment variables (create a `.env` file):
+3. Configure environment variables (create a `.env` file in the `frontend/` directory):
    ```env
    VITE_FIREBASE_API_KEY=your_firebase_api_key
    VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
@@ -101,6 +104,13 @@ SignalRX/
    ```bash
    npm run dev
    ```
+   *The frontend will be available at `http://localhost:5173`*
+
+### 3. Testing the Application (For Reviewers)
+1. Open your browser and navigate to `http://localhost:5173`.
+2. Click on **Log In** or **Sign Up**.
+3. *Note for Reviewers*: For ease of testing and evaluation, the OTP (One-Time Password) verification step has been **bypassed** in this development build.
+4. You will be automatically redirected to the main dashboard where you can interact with the SignalRX platform, view the configured signals, and monitor patient safety trends.
 
 ## License
 
