@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { 
   signUpUser, 
+  loginUser,
   generateOTP, 
   storeOTP, 
   sendOTPEmail, 
@@ -87,7 +88,13 @@ export default function SignupPage() {
       if (err.message.includes('Invalid OTP') || err.message.includes('expired')) {
         setError(err.message);
       } else if (err.code === 'auth/email-already-in-use') {
-        setError('An account with this email already exists. Please log in.');
+        // Self-healing: if the user was deleted from Firestore but exists in Auth
+        try {
+          await loginUser(email, password);
+          navigate('/dashboard');
+        } catch (loginErr) {
+          setError('An account with this email exists. Please use the exact password to sync it, or go to Log In.');
+        }
       } else if (err.code === 'auth/weak-password') {
         setError('Password is too weak. Use at least 6 characters.');
       } else if (err.code === 'auth/invalid-email') {

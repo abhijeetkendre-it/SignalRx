@@ -79,21 +79,33 @@ export async function loginUser(email, password) {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
 
-  // Check if user is disabled
+  // Check if user exists in Firestore
   const userDoc = await getDoc(doc(db, 'users', user.uid));
-  if (userDoc.exists() && userDoc.data().status === 'disabled') {
-    await signOut(auth);
-    throw new Error('Your account has been disabled. Contact admin.');
+  
+  if (!userDoc.exists()) {
+    // Self-healing: if user exists in Auth but not Firestore, recreate profile
+    await setDoc(doc(db, 'users', user.uid), {
+      name: user.displayName || 'Restored User',
+      email: user.email,
+      createdAt: serverTimestamp(),
+      lastLogin: serverTimestamp(),
+      status: 'active',
+      loginCount: 1
+    });
+    await logActivity('login_restored', email, 'Restored User');
+  } else {
+    if (userDoc.data().status === 'disabled') {
+      await signOut(auth);
+      throw new Error('Your account has been disabled. Contact admin.');
+    }
+
+    // Update last login
+    await updateDoc(doc(db, 'users', user.uid), {
+      lastLogin: serverTimestamp(),
+      loginCount: (userDoc.data()?.loginCount || 0) + 1
+    });
+    await logActivity('login', email, userDoc.data()?.name || '');
   }
-
-  // Update last login
-  await updateDoc(doc(db, 'users', user.uid), {
-    lastLogin: serverTimestamp(),
-    loginCount: (userDoc.data()?.loginCount || 0) + 1
-  });
-
-  // Log activity
-  await logActivity('login', email, userDoc.data()?.name || '');
 
   return user;
 }
