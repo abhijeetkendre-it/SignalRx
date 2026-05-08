@@ -49,9 +49,23 @@ const googleProvider = new GoogleAuthProvider();
 // ── Auth Functions ──────────────────────────────────────────
 
 export async function checkUserExistsByEmail(email) {
-  const q = query(collection(db, 'users'), where('email', '==', email));
+  const cleanEmail = email.trim().toLowerCase();
+  
+  // 1. Try exact match first (fastest)
+  const q = query(collection(db, 'users'), where('email', '==', email.trim()));
   const snapshot = await getDocs(q);
-  return !snapshot.empty;
+  if (!snapshot.empty) return true;
+
+  // 2. Try lowercased exact match
+  const q2 = query(collection(db, 'users'), where('email', '==', cleanEmail));
+  const snapshot2 = await getDocs(q2);
+  if (!snapshot2.empty) return true;
+
+  // 3. Fallback: fetch all and do case-insensitive match
+  const allUsers = await getDocs(collection(db, 'users'));
+  return allUsers.docs.some(doc => 
+    doc.data().email?.trim().toLowerCase() === cleanEmail
+  );
 }
 
 

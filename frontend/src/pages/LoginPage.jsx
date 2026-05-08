@@ -38,14 +38,15 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // 1. Try logging in first to verify password and Auth existence natively
-      await loginUser(cleanEmail, password);
-      
-      // If we succeed, the user exists and the password is correct!
-      // Log them out immediately so they don't bypass the OTP step.
-      await logoutUser();
-      
-      // 2. Send OTP and show inline OTP box
+      // Robustly check if user exists in Firestore
+      const exists = await checkUserExistsByEmail(cleanEmail);
+      if (!exists) {
+        // If not in Firestore, redirect to signup
+        navigate('/signup', { state: { email: cleanEmail } });
+        return;
+      }
+
+      // Existing user, send OTP and show inline OTP box
       const otp = generateOTP();
       await storeOTP(cleanEmail, otp);
       try {
@@ -55,20 +56,7 @@ export default function LoginPage() {
       }
       setShowInlineOTP(true);
     } catch (err) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        // We can't tell if it's a wrong password or non-existent user due to Firebase protection.
-        // Use Firestore to guess:
-        const exists = await checkUserExistsByEmail(cleanEmail);
-        if (!exists) {
-          // If not in Firestore, assume new user -> redirect to signup
-          navigate('/signup', { state: { email: cleanEmail } });
-        } else {
-          // In Firestore, so it must be a wrong password!
-          setError('Incorrect password. Please try again.');
-        }
-      } else {
-        setError(err.message || 'Login failed. Please try again.');
-      }
+      setError('Failed to process login. Please try again.');
     } finally {
       setLoading(false);
     }
