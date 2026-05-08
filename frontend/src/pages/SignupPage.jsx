@@ -36,6 +36,7 @@ export default function SignupPage() {
   };
 
   const handleInitialSubmit = async () => {
+    const cleanEmail = email.trim();
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -46,18 +47,18 @@ export default function SignupPage() {
     setError('');
 
     try {
-      const exists = await checkUserExistsByEmail(email);
+      const exists = await checkUserExistsByEmail(cleanEmail);
       if (exists) {
         // User already exists, redirect to login
-        navigate('/login', { state: { email } });
+        navigate('/login', { state: { email: cleanEmail } });
         return;
       }
 
       // Not an existing user, send OTP and show inline OTP box
       const otp = generateOTP();
-      await storeOTP(email, otp);
+      await storeOTP(cleanEmail, otp);
       try {
-        await sendOTPEmail(email, otp, name);
+        await sendOTPEmail(cleanEmail, otp, name);
       } catch (err) {
         console.log('OTP for development:', otp);
       }
@@ -71,6 +72,7 @@ export default function SignupPage() {
   };
 
   const handleFinalSubmit = async () => {
+    const cleanEmail = email.trim();
     if (!otpCode || otpCode.length !== 6) {
       setError('Please enter a valid 6-digit OTP');
       return;
@@ -80,9 +82,9 @@ export default function SignupPage() {
     setError('');
 
     try {
-      await verifyOTP(email, otpCode);
+      await verifyOTP(cleanEmail, otpCode);
       // OTP verified, now create user and login
-      await signUpUser(email, password, name);
+      await signUpUser(cleanEmail, password, name);
       navigate('/dashboard');
     } catch (err) {
       if (err.message.includes('Invalid OTP') || err.message.includes('expired')) {
@@ -90,7 +92,7 @@ export default function SignupPage() {
       } else if (err.code === 'auth/email-already-in-use') {
         // Self-healing: if the user was deleted from Firestore but exists in Auth
         try {
-          await loginUser(email, password);
+          await loginUser(cleanEmail, password);
           navigate('/dashboard');
         } catch (loginErr) {
           setError('An account with this email exists. Please use the exact password to sync it, or go to Log In.');

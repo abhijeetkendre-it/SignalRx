@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { 
   loginUser, 
+  logoutUser,
   loginWithGoogle, 
   generateOTP, 
   storeOTP, 
@@ -27,7 +28,8 @@ export default function LoginPage() {
   const [userName, setUserName] = useState('');
 
   const handleInitialSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password.trim()) {
       setError('Please enter both email and password');
       return;
     }
@@ -36,24 +38,37 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const exists = await checkUserExistsByEmail(email);
-      if (!exists) {
-        // Not an existing user, redirect to signup
-        navigate('/signup', { state: { email } });
-        return;
-      }
-
-      // Existing user, send OTP and show inline OTP box
+      // 1. Try logging in first to verify password and Auth existence natively
+      await loginUser(cleanEmail, password);
+      
+      // If we succeed, the user exists and the password is correct!
+      // Log them out immediately so they don't bypass the OTP step.
+      await logoutUser();
+      
+      // 2. Send OTP and show inline OTP box
       const otp = generateOTP();
-      await storeOTP(email, otp);
+      await storeOTP(cleanEmail, otp);
       try {
-        await sendOTPEmail(email, otp, 'User');
+        await sendOTPEmail(cleanEmail, otp, 'User');
       } catch {
         console.log('OTP for development:', otp);
       }
       setShowInlineOTP(true);
     } catch (err) {
-      setError('Failed to check user existence. Please try again.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        // We can't tell if it's a wrong password or non-existent user due to Firebase protection.
+        // Use Firestore to guess:
+        const exists = await checkUserExistsByEmail(cleanEmail);
+        if (!exists) {
+          // If not in Firestore, assume new user -> redirect to signup
+          navigate('/signup', { state: { email: cleanEmail } });
+        } else {
+          // In Firestore, so it must be a wrong password!
+          setError('Incorrect password. Please try again.');
+        }
+      } else {
+        setError(err.message || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
