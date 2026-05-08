@@ -127,7 +127,7 @@ export default function LandingPage() {
         </div>
         <div className="hero-right">
           <div className="hero-image-wrapper">
-            <img src="/hero-image.png" alt="SignalRX Dashboard" />
+            <img src={`${import.meta.env.BASE_URL}hero-image.png`} alt="SignalRX Dashboard" />
             <div className="hero-float-card">
               <div className="float-icon">⚡</div>
               <div className="float-text">

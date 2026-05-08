@@ -1,24 +1,32 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import { loginUser, logoutUser, loginWithGoogle, generateOTP, storeOTP, sendOTPEmail, verifyOTP } from '../services/firebase';
-import OTPModal from '../components/OTPModal';
+import { 
+  loginUser, 
+  loginWithGoogle, 
+  generateOTP, 
+  storeOTP, 
+  sendOTPEmail, 
+  verifyOTP,
+  checkUserExistsByEmail 
+} from '../services/firebase';
+import OTPInputBoxes from '../components/OTPInputBoxes';
 import './AuthPages.css';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [currentOTP, setCurrentOTP] = useState('');
+  const [showInlineOTP, setShowInlineOTP] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [userName, setUserName] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleInitialSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');
       return;
@@ -28,6 +36,41 @@ export default function LoginPage() {
     setError('');
 
     try {
+      const exists = await checkUserExistsByEmail(email);
+      if (!exists) {
+        // Not an existing user, redirect to signup
+        navigate('/signup', { state: { email } });
+        return;
+      }
+
+      // Existing user, send OTP and show inline OTP box
+      const otp = generateOTP();
+      await storeOTP(email, otp);
+      try {
+        await sendOTPEmail(email, otp, 'User');
+      } catch {
+        console.log('OTP for development:', otp);
+      }
+      setShowInlineOTP(true);
+    } catch (err) {
+      setError('Failed to check user existence. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await verifyOTP(email, otpCode);
+      // OTP verified, now check password and login
       const user = await loginUser(email, password);
       setUserName(user.displayName || '');
 
@@ -36,17 +79,27 @@ export default function LoginPage() {
       }
       navigate('/dashboard');
     } catch (err) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password. Please check your credentials.');
+      if (err.message.includes('Invalid OTP') || err.message.includes('expired')) {
+        setError(err.message);
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+        setShowInlineOTP(false); // Reset OTP flow if password was wrong
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many failed attempts. Please try again later.');
-      } else if (err.code === 'auth/wrong-password') {
-        setError('Incorrect password. Please try again.');
       } else {
         setError(err.message || 'Login failed. Please try again.');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!showInlineOTP) {
+      await handleInitialSubmit();
+    } else {
+      await handleFinalSubmit();
     }
   };
 
@@ -67,27 +120,6 @@ export default function LoginPage() {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleOTPVerify = async (code) => {
-    await verifyOTP(email, code);
-    // OTP verified — NOW sign back in and redirect
-    await loginUser(email, password);
-    if (remember) {
-      localStorage.setItem('signalrx_remember', email);
-    }
-    navigate('/dashboard');
-  };
-
-  const handleOTPResend = async () => {
-    const otp = generateOTP();
-    setCurrentOTP(otp);
-    await storeOTP(email, otp);
-    try {
-      await sendOTPEmail(email, otp, userName || 'User');
-    } catch {
-      console.log('OTP for development:', otp);
     }
   };
 
@@ -120,6 +152,7 @@ export default function LoginPage() {
                 placeholder="name@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                disabled={showInlineOTP}
                 required
               />
             </div>
@@ -133,6 +166,7 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  disabled={showInlineOTP}
                   required
                 />
                 <button type="button" className="eye-toggle" onClick={() => setShowPassword(!showPassword)}>
@@ -140,6 +174,15 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {showInlineOTP && (
+              <div className="auth-field otp-box-anim-enter" style={{ marginTop: '16px' }}>
+                <label style={{ textAlign: 'center', display: 'block', color: '#06d6d6' }}>
+                  Enter the OTP sent to your email
+                </label>
+                <OTPInputBoxes length={6} onComplete={setOtpCode} />
+              </div>
+            )}
 
             <div className="auth-row">
               <label className="auth-remember">
@@ -154,7 +197,7 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" className="auth-submit" disabled={loading}>
-              {loading ? 'Signing In...' : 'Sign In'}
+              {loading ? 'Processing...' : (showInlineOTP ? 'Verify & Login' : 'Sign In')}
             </button>
           </form>
 
@@ -177,15 +220,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-
-      {showOTP && (
-        <OTPModal
-          email={email}
-          onVerify={handleOTPVerify}
-          onResend={handleOTPResend}
-          onClose={() => {}}
-        />
-      )}
     </div>
   );
 }

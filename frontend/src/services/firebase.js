@@ -20,7 +20,8 @@ import {
   query,
   orderBy,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  where
 } from 'firebase/firestore';
 
 // ═══════════════════════════════════════════════════════════
@@ -46,6 +47,13 @@ export const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 // ── Auth Functions ──────────────────────────────────────────
+
+export async function checkUserExistsByEmail(email) {
+  const q = query(collection(db, 'users'), where('email', '==', email));
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
 
 export async function signUpUser(email, password, name) {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);

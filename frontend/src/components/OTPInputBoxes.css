@@ -1,0 +1,40 @@
+.otp-boxes-container {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 16px 0 24px 0;
+}
+
+.otp-box {
+  width: 48px;
+  height: 56px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+  color: white;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.otp-box:focus {
+  border-color: #06d6d6;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(6, 214, 214, 0.2);
+}
+
+.otp-box-anim-enter {
+  animation: slideDown 0.3s ease forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
